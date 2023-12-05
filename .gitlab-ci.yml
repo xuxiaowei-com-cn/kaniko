@@ -1,0 +1,33 @@
+stages:
+  - docker-build
+
+docker-build:
+  stage: docker-build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - tag=v1.19.0
+    - docker pull gcr.io/kaniko-project/executor:$tag && PULL_RESULT="ok"
+    - if [ "$PULL_RESULT" == "ok" ]; then echo '拉取完成'; else echo '拉取失败' && xxxx; fi
+    - docker images
+    - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
+    - docker tag gcr.io/kaniko-project/executor:$tag $DOCKER_USERNAME/kaniko-project-executor:$tag
+    - docker images
+    - docker push $DOCKER_USERNAME/kaniko-project-executor:$tag
+    - tag=v1.19.0-debug
+    - docker pull gcr.io/kaniko-project/executor:$tag && PULL_RESULT="ok"
+    - if [ "$PULL_RESULT" == "ok" ]; then echo '拉取完成'; else echo '拉取失败' && xxxx; fi
+    - docker images
+    - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
+    - docker tag gcr.io/kaniko-project/executor:$tag $DOCKER_USERNAME/kaniko-project-executor:$tag
+    - docker images
+    - docker push $DOCKER_USERNAME/kaniko-project-executor:$tag
+    - tag=v1.19.0-slim
+    - docker pull gcr.io/kaniko-project/executor:$tag && PULL_RESULT="ok"
+    - if [ "$PULL_RESULT" == "ok" ]; then echo '拉取完成'; else echo '拉取失败' && xxxx; fi
+    - docker images
+    - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
+    - docker tag gcr.io/kaniko-project/executor:$tag $DOCKER_USERNAME/kaniko-project-executor:$tag
+    - docker images
+    - docker push $DOCKER_USERNAME/kaniko-project-executor:$tag
