@@ -37,6 +37,9 @@ for tag in resp_json:
         file.write(msg)
         file.write('\n')
 
+        if num is not None and i >= num:
+            break
+
 file.write('\n')
 
 i = 0
