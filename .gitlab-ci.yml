@@ -1,6 +1,7 @@
 stages:
   - docker-build-before
   - docker-build
+  - merge-manifests
 
 docker-build-before:
   stage: docker-build-before
@@ -9,9 +10,12 @@ docker-build-before:
     - pip install requests
     - python tags.py
     - ls
+    - cat tags.sh
+    - cat tool.sh
   artifacts:
     paths:
       - tags.sh
+      - tool.sh
 
 docker-build:
   stage: docker-build
@@ -26,8 +30,22 @@ docker-build:
     - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
     - ls
     - chmod +x tags.sh
-    - chmod +x tags_push.sh
     - ./tags.sh
-    - docker images
-    - docker images "$DOCKER_USERNAME"
-    - ./tags_push.sh
+  artifacts:
+    paths:
+      - tool.sh
+
+merge-manifests:
+  stage: merge-manifests
+  needs:
+    - job: docker-build
+      artifacts: true
+  image:
+    name: mplatform/manifest-tool:alpine
+    entrypoint: [ "" ]
+  script:
+    - manifest-tool --help
+    - manifest-tool push --help
+    - manifest-tool push from-args --help
+    - chmod +x tool.sh
+    - ./tool.sh
