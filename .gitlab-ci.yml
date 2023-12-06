@@ -1,33 +1,52 @@
 stages:
   - docker-build
+  - merge-manifests
 
 docker-build:
   stage: docker-build
   image: docker:latest
   services:
     - docker:dind
+  variables:
+    EXECUTOR_ARCHITECTURES: amd64 arm64 s390x ppc64le
+    EXECUTOR_DEBUG_ARCHITECTURES: amd64 arm64 s390x
+    EXECUTOR_SLIM_ARCHITECTURES: amd64 arm64 s390x ppc64le
+    TAG: v1.19.0
+  before_script:
+    - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
   script:
-    - tag=v1.19.0
-    - docker pull gcr.io/kaniko-project/executor:$tag && PULL_RESULT="ok"
-    - if [ "$PULL_RESULT" == "ok" ]; then echo '拉取完成'; else echo '拉取失败' && xxxx; fi
-    - docker images
-    - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
-    - docker tag gcr.io/kaniko-project/executor:$tag $DOCKER_USERNAME/kaniko-project-executor:$tag
-    - docker images
-    - docker push $DOCKER_USERNAME/kaniko-project-executor:$tag
-    - tag=v1.19.0-debug
-    - docker pull gcr.io/kaniko-project/executor:$tag && PULL_RESULT="ok"
-    - if [ "$PULL_RESULT" == "ok" ]; then echo '拉取完成'; else echo '拉取失败' && xxxx; fi
-    - docker images
-    - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
-    - docker tag gcr.io/kaniko-project/executor:$tag $DOCKER_USERNAME/kaniko-project-executor:$tag
-    - docker images
-    - docker push $DOCKER_USERNAME/kaniko-project-executor:$tag
-    - tag=v1.19.0-slim
-    - docker pull gcr.io/kaniko-project/executor:$tag && PULL_RESULT="ok"
-    - if [ "$PULL_RESULT" == "ok" ]; then echo '拉取完成'; else echo '拉取失败' && xxxx; fi
-    - docker images
-    - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
-    - docker tag gcr.io/kaniko-project/executor:$tag $DOCKER_USERNAME/kaniko-project-executor:$tag
-    - docker images
-    - docker push $DOCKER_USERNAME/kaniko-project-executor:$tag
+    - |
+      for platform in $EXECUTOR_ARCHITECTURES; do
+        docker pull --platform=linux/$platform gcr.io/kaniko-project/executor:$TAG && docker tag gcr.io/kaniko-project/executor:$TAG $DOCKER_USERNAME/kaniko-project-executor:$TAG-$platform || echo "不存在：gcr.io/kaniko-project/executor:$TAG";
+        docker push $DOCKER_USERNAME/kaniko-project-executor:$TAG-$platform || echo "不存在：$DOCKER_USERNAME/kaniko-project-executor:$TAG-$platform";
+      done
+    - |
+      for platform in $EXECUTOR_DEBUG_ARCHITECTURES; do
+        docker pull --platform=linux/$platform gcr.io/kaniko-project/executor:$TAG-debug && docker tag gcr.io/kaniko-project/executor:$TAG-debug $DOCKER_USERNAME/kaniko-project-executor:$TAG-debug-$platform || echo "不存在：gcr.io/kaniko-project/executor:$TAG-debug";
+        docker push $DOCKER_USERNAME/kaniko-project-executor:$TAG-debug-$platform || echo "不存在：$DOCKER_USERNAME/kaniko-project-executor:$TAG-debug-$platform";
+      done
+    - |
+      for platform in $EXECUTOR_SLIM_ARCHITECTURES; do
+        docker pull --platform=linux/$platform gcr.io/kaniko-project/executor:$TAG-slim && docker tag gcr.io/kaniko-project/executor:$TAG-slim $DOCKER_USERNAME/kaniko-project-executor:$TAG-slim-$platform || echo "不存在：gcr.io/kaniko-project/executor:$TAG-slim";
+        docker push $DOCKER_USERNAME/kaniko-project-executor:$TAG-slim-$platform || echo "不存在：$DOCKER_USERNAME/kaniko-project-executor:$TAG-slim-$platform";
+      done
+
+merge-manifests:
+  stage: merge-manifests
+  needs:
+    - job: docker-build
+      artifacts: true
+  image:
+    name: mplatform/manifest-tool:alpine
+    entrypoint: [ "" ]
+  variables:
+    EXECUTOR_ARCHITECTURES: linux/amd64,linux/arm64,linux/s390x,linux/ppc64le
+    EXECUTOR_DEBUG_ARCHITECTURES: linux/amd64,linux/arm64,linux/s390x
+    EXECUTOR_SLIM_ARCHITECTURES: linux/amd64,linux/arm64,linux/s390x,linux/ppc64le
+  script:
+    - manifest-tool --help
+    - manifest-tool push --help
+    - manifest-tool push from-args --help
+    - manifest-tool --username=$DOCKER_USERNAME --password=$DOCKER_PASSWORD push from-args --platforms $EXECUTOR_ARCHITECTURES       --template $DOCKER_USERNAME/kaniko-project-executor:$TAG-ARCH        --target $DOCKER_USERNAME/kaniko-project-executor:$TAG        --ignore-missing || echo "无法合并 $DOCKER_USERNAME/kaniko-project-executor:$TAG-ARCH"
+    - manifest-tool --username=$DOCKER_USERNAME --password=$DOCKER_PASSWORD push from-args --platforms $EXECUTOR_DEBUG_ARCHITECTURES --template $DOCKER_USERNAME/kaniko-project-executor:$TAG-debug-ARCH  --target $DOCKER_USERNAME/kaniko-project-executor:$TAG-debug  --ignore-missing || echo "无法合并 $DOCKER_USERNAME/kaniko-project-executor:$TAG-debug-ARCH"
+    - manifest-tool --username=$DOCKER_USERNAME --password=$DOCKER_PASSWORD push from-args --platforms $EXECUTOR_SLIM_ARCHITECTURES  --template $DOCKER_USERNAME/kaniko-project-executor:$TAG-slim-ARCH   --target $DOCKER_USERNAME/kaniko-project-executor:$TAG-slim   --ignore-missing || echo "无法合并 $DOCKER_USERNAME/kaniko-project-executor:$TAG-slim-ARCH"
