@@ -11,6 +11,8 @@ docker-build:
     EXECUTOR_ARCHITECTURES: amd64 arm64 s390x ppc64le
     EXECUTOR_DEBUG_ARCHITECTURES: amd64 arm64 s390x
     EXECUTOR_SLIM_ARCHITECTURES: amd64 arm64 s390x ppc64le
+  before_script:
+    - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
   script:
     - |
       for platform in $EXECUTOR_ARCHITECTURES; do
